@@ -6,9 +6,9 @@ import Button from '../components/Button';
 import AvatarPicker from '../components/AvatarPicker';
 
 const Home = () => {
-  const { createRoom, joinRoom, room } = useGame();
-  const [username, setUsername] = useState('');
-  const [avatar, setAvatar] = useState('🦊');
+  const { createRoom, joinRoom, user } = useGame();
+  const [username, setUsername] = useState(user?.username || '');
+  const [avatar, setAvatar] = useState(user?.avatar || '🦊');
   const [roomIdInput, setRoomIdInput] = useState('');
   const [mode, setMode] = useState('select'); // select, create, join
 

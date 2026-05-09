@@ -81,15 +81,16 @@ export const GameProvider = ({ children }) => {
       socket.off('new-message');
       socket.off('player-typing');
       socket.off('player-stop-typing');
-      socket.off('player-disconnected');
+      socket.off('player-left');
       socket.off('error-message');
     };
   }, [socket]);
 
   const leaveRoom = useCallback(() => {
+    if (room) socket.emit('leave-room', room.id);
     setRoom(null);
     setMessages([]);
-  }, []);
+  }, [socket, room]);
 
   const createRoom = useCallback((username, avatar) => {
     const userData = { username, avatar };

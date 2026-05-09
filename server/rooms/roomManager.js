@@ -12,10 +12,12 @@ class RoomManager {
       messages: [],
       submissions: {}, // socketId -> number
       submittedPlayers: [], // socketIds
+      replayPlayers: [], // socketIds
       readyPlayers: new Set(),
       lastResult: null,
     };
     this.rooms.set(roomId, room);
+    console.log(`[Room ${roomId}] Created`);
     return room;
   }
 
@@ -33,6 +35,11 @@ class RoomManager {
   joinRoom(roomId, player) {
     const room = this.rooms.get(roomId);
     if (!room) return { error: 'Room not found' };
+    
+    // Check if player is already in the room
+    const existingPlayer = room.players.find(p => p.id === player.id);
+    if (existingPlayer) return { room: this.getRoom(roomId) };
+
     if (room.players.length >= 2) return { error: 'Room is full' };
     
     room.players.push({
@@ -62,6 +69,7 @@ class RoomManager {
     room.submissions = {};
     room.submittedPlayers = [];
     room.replayPlayers = [];
+    room.readyPlayers.clear(); // Clear all ready states
     room.lastResult = null;
     room.players.forEach(p => p.ready = false);
     room.round = 1;
@@ -89,6 +97,10 @@ class RoomManager {
   submitNumber(roomId, socketId, number) {
     const room = this.rooms.get(roomId);
     if (!room) return null;
+
+    if (typeof number !== 'number' || !Number.isInteger(number) || number < 1 || number > 20) {
+      return null;
+    }
 
     room.submissions[socketId] = number;
     if (!room.submittedPlayers.includes(socketId)) {

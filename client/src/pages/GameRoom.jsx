@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Copy, Check, LogOut, Users, Play, RotateCcw, Trophy } from 'lucide-react';
 import confetti from 'canvas-confetti';
@@ -20,24 +20,30 @@ const GameRoom = () => {
   const me = room?.players?.find(p => p.id === socket?.id);
   const opponent = room?.players?.find(p => p.id !== socket?.id);
 
+  const lastRoundRef = useRef(room?.round || 1);
+  const hasCelebratedRef = useRef(false);
+
   useEffect(() => {
     if (!me) return;
     
-    // Reset selection whenever a new round starts (playing phase)
-    if (room?.status === 'playing' || room?.status === 'waiting') {
+    // Only reset selection when the round number changes or room resets to waiting
+    if (room?.round !== lastRoundRef.current || room?.status === 'waiting') {
       setSelectedNum(null);
       setHasSubmittedLocal(false);
+      lastRoundRef.current = room?.round;
+      hasCelebratedRef.current = false; // Reset for new round
     }
     
-    if (room?.status === 'result' && room.lastResult?.type === 'match') {
+    if (room?.status === 'result' && room.lastResult?.type === 'match' && !hasCelebratedRef.current) {
       confetti({
         particleCount: 150,
         spread: 70,
         origin: { y: 0.6 },
         colors: ['#6366f1', '#a855f7', '#ec4899']
       });
+      hasCelebratedRef.current = true; // Mark as celebrated for this result
     }
-  }, [room?.status, room?.lastResult, me?.id]); // Use ID for dependency
+  }, [room?.status, room?.lastResult, room?.round, me?.id]); // Added round to dependencies
 
   const copyRoomId = () => {
     if (!room?.id) return;
@@ -53,7 +59,24 @@ const GameRoom = () => {
     }
   };
 
-  if (!room || !me) return null;
+  if (!room || !me) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+        <div className="relative w-16 h-16 mb-6">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            className="w-full h-full border-4 border-primary/20 border-t-primary rounded-full"
+          />
+        </div>
+        <h2 className="text-xl font-bold neon-text animate-pulse">CONNECTING...</h2>
+        <p className="text-white/40 text-sm mt-2">Synchronizing with room state</p>
+        <button onClick={leaveRoom} className="mt-8 text-white/40 hover:text-white transition-colors text-sm underline">
+          Return Home
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-white p-4 md:p-8 flex flex-col items-center">
@@ -204,7 +227,7 @@ const GameRoom = () => {
                       number={num}
                       isSelected={selectedNum === num}
                       onClick={setSelectedNum}
-                      disabled={hasSubmitted}
+                      disabled={hasSubmittedLocal}
                     />
                   ))}
                 </div>
@@ -212,13 +235,13 @@ const GameRoom = () => {
                 <div className="mt-10 flex justify-center">
                   <Button
                     onClick={handleSubmit}
-                    disabled={selectedNum === null || hasSubmitted}
+                    disabled={selectedNum === null || hasSubmittedLocal}
                     className={cn(
                       "px-12 py-4 text-xl uppercase tracking-widest font-black",
-                      hasSubmitted && "bg-green-500/20 text-green-400 border-green-500/30"
+                      hasSubmittedLocal && "bg-green-500/20 text-green-400 border-green-500/30"
                     )}
                   >
-                    {hasSubmitted ? 'Submitted!' : 'Lock It In'}
+                    {hasSubmittedLocal ? 'Submitted!' : 'Lock It In'}
                   </Button>
                 </div>
               </motion.div>

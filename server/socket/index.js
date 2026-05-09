@@ -49,17 +49,21 @@ const socketHandler = (io) => {
     });
 
     socket.on('submit-number', ({ roomId, number }) => {
-      const room = roomManager.submitNumber(roomId, socket.id, number);
+      let room = roomManager.submitNumber(roomId, socket.id, number);
       if (!room) return;
+
+      const originalRoom = roomManager.rooms.get(roomId);
 
       if (room.status === 'revealing') {
         // Both submitted
-        const playerIds = Object.keys(room.submissions);
-        const num1 = room.submissions[playerIds[0]];
-        const num2 = room.submissions[playerIds[1]];
+        const playerIds = Object.keys(originalRoom.submissions);
+        const num1 = originalRoom.submissions[playerIds[0]];
+        const num2 = originalRoom.submissions[playerIds[1]];
         
         const result = calculateResult(num1, num2);
-        room.lastResult = {
+        
+        // Update original room directly
+        originalRoom.lastResult = {
           selections: {
             [playerIds[0]]: num1,
             [playerIds[1]]: num2
@@ -67,15 +71,14 @@ const socketHandler = (io) => {
           ...result
         };
 
-        if (result.type === 'match') {
-          // Score logic removed
-        }
-
-        io.to(roomId).emit('room-updated', getSafeRoom(room)); 
+        io.to(roomId).emit('room-updated', getSafeRoom(roomManager.getRoom(roomId))); 
         
         setTimeout(() => {
-          room.status = 'result';
-          io.to(roomId).emit('room-updated', getSafeRoom(room));
+          const currentRoom = roomManager.rooms.get(roomId);
+          if (currentRoom && currentRoom.status === 'revealing') {
+            currentRoom.status = 'result';
+            io.to(roomId).emit('room-updated', getSafeRoom(roomManager.getRoom(roomId)));
+          }
         }, 3000); 
       } else {
         io.to(roomId).emit('room-updated', getSafeRoom(room));
@@ -83,12 +86,16 @@ const socketHandler = (io) => {
     });
 
     socket.on('send-message', ({ roomId, message, username, avatar }) => {
+      if (typeof message !== 'string' || message.trim() === '') return;
+      
+      const safeMessage = message.substring(0, 500); // Max 500 chars
+      
       const msgData = {
         id: Date.now(),
         senderId: socket.id,
         username,
         avatar,
-        text: message,
+        text: safeMessage,
         timestamp: new Date().toISOString()
       };
       const room = roomManager.addMessage(roomId, msgData);
@@ -112,6 +119,22 @@ const socketHandler = (io) => {
       }
     });
 
+    socket.on('leave-room', (roomId) => {
+      const room = roomManager.getRoom(roomId);
+      if (room) {
+        const player = room.players.find(p => p.id === socket.id);
+        const username = player ? player.username : 'Someone';
+        
+        const updatedRoom = roomManager.leaveRoom(roomId, socket.id);
+        socket.leave(roomId);
+        
+        if (updatedRoom) {
+          io.to(roomId).emit('room-updated', getSafeRoom(updatedRoom));
+          io.to(roomId).emit('player-left', { username });
+        }
+      }
+    });
+
     socket.on('disconnecting', () => {
       for (const roomId of socket.rooms) {
         if (roomId !== socket.id) {
@@ -122,7 +145,7 @@ const socketHandler = (io) => {
             
             const updatedRoom = roomManager.leaveRoom(roomId, socket.id);
             if (updatedRoom) {
-              io.to(roomId).emit('room-updated', updatedRoom);
+              io.to(roomId).emit('room-updated', getSafeRoom(updatedRoom));
               io.to(roomId).emit('player-left', { username });
             }
           }
