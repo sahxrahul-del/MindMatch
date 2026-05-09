@@ -6,33 +6,38 @@ import Button from '../components/Button';
 import AvatarPicker from '../components/AvatarPicker';
 
 const Home = () => {
-  const { createRoom, joinRoom, user } = useGame();
+  const { createRoom, joinRoom, user, socket } = useGame(); // Added socket to check connection
   const [username, setUsername] = useState(user?.username || '');
   const [avatar, setAvatar] = useState(user?.avatar || '🦊');
   const [roomIdInput, setRoomIdInput] = useState('');
   const [mode, setMode] = useState('select'); // select, create, join
 
+  const isConnected = socket?.connected;
+
   const handleCreate = (e) => {
     e.preventDefault();
-    console.log('按钮被点击: Launch Room', { username, avatar });
     if (!username) return alert('Please enter a username');
+    console.log('Attempting to create room...');
     createRoom(username, avatar);
   };
 
   const handleJoin = (e) => {
     e.preventDefault();
-    console.log('按钮被点击: Enter Room', { roomIdInput, username, avatar });
     if (!username) return alert('Please enter a username');
     if (!roomIdInput) return alert('Please enter a Room ID');
+    console.log('Attempting to join room:', roomIdInput);
     joinRoom(roomIdInput.toUpperCase(), username, avatar);
   };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-background via-surface to-background overflow-hidden relative">
-      {/* Background Decor */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 blur-[120px] rounded-full" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary/10 blur-[120px] rounded-full" />
-      
+      {/* Connection Status Badge */}
+      <div className="absolute top-6 right-6 flex items-center gap-2 glass px-3 py-1.5 rounded-full border border-white/10 z-50">
+        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 shadow-[0_0_10px_#22c55e]' : 'bg-red-500 animate-pulse'}`} />
+        <span className="text-[10px] font-bold uppercase tracking-wider text-white/60">
+          {isConnected ? 'Server Online' : 'Server Offline'}
+        </span>
+      </div>      
       <motion.div
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
