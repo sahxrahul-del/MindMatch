@@ -14,12 +14,14 @@ const Home = () => {
 
   const handleCreate = (e) => {
     e.preventDefault();
+    console.log('按钮被点击: Launch Room', { username, avatar });
     if (!username) return alert('Please enter a username');
     createRoom(username, avatar);
   };
 
   const handleJoin = (e) => {
     e.preventDefault();
+    console.log('按钮被点击: Enter Room', { roomIdInput, username, avatar });
     if (!username) return alert('Please enter a username');
     if (!roomIdInput) return alert('Please enter a Room ID');
     joinRoom(roomIdInput.toUpperCase(), username, avatar);
