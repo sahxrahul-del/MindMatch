@@ -6,10 +6,11 @@ const getSafeRoom = (room) => {
   if (!room) return null;
   const safeRoom = { ...room };
   
-  // Hide actual numbers unless we are in reveal or result phase
-  if (room.status !== 'revealing' && room.status !== 'result') {
+  // Security: Only expose actual numbers in 'result' phase.
+  // During 'revealing', the client only needs to know that both have submitted,
+  // not what the numbers are. This prevents network-tab cheating.
+  if (room.status !== 'result') {
     safeRoom.submissions = {};
-    // Still have submittedPlayers array for indicators
   }
   
   return safeRoom;
@@ -22,7 +23,8 @@ const socketHandler = (io) => {
     socket.on('create-room', ({ username, avatar }) => {
       const roomId = generateRoomId();
       roomManager.createRoom(roomId);
-      const room = roomManager.joinRoom(roomId, { id: socket.id, username, avatar }).room;
+      const result = roomManager.joinRoom(roomId, { id: socket.id, username, avatar });
+      const room = result.room;
       
       socket.join(roomId);
       socket.emit('room-created', getSafeRoom(room));
@@ -49,38 +51,47 @@ const socketHandler = (io) => {
     });
 
     socket.on('submit-number', ({ roomId, number }) => {
-      let room = roomManager.submitNumber(roomId, socket.id, number);
-      if (!room) return;
+      const result = roomManager.submitNumber(roomId, socket.id, number);
+      
+      if (result.error) {
+        return socket.emit('error-message', result.error);
+      }
 
+      const room = result.room;
       const originalRoom = roomManager.rooms.get(roomId);
 
       if (room.status === 'revealing') {
-        // Both submitted
+        // Both submitted - execute atomic reveal logic
         const playerIds = Object.keys(originalRoom.submissions);
         const num1 = originalRoom.submissions[playerIds[0]];
         const num2 = originalRoom.submissions[playerIds[1]];
         
-        const result = calculateResult(num1, num2);
+        const calculation = calculateResult(num1, num2);
+        const currentRound = room.round;
         
-        // Update original room directly
+        // Lock the result into the original room object
         originalRoom.lastResult = {
           selections: {
             [playerIds[0]]: num1,
             [playerIds[1]]: num2
           },
-          ...result
+          ...calculation
         };
 
+        // Notify everyone that revealing has started
         io.to(roomId).emit('room-updated', getSafeRoom(roomManager.getRoom(roomId))); 
         
+        // Atomic transition to result after animation time
         setTimeout(() => {
-          const currentRoom = roomManager.rooms.get(roomId);
-          if (currentRoom && currentRoom.status === 'revealing') {
-            currentRoom.status = 'result';
+          const roomToUpdate = roomManager.rooms.get(roomId);
+          // Safety: Only transition if we are still in the same round and still revealing
+          if (roomToUpdate && roomToUpdate.status === 'revealing' && roomToUpdate.round === currentRound) {
+            roomToUpdate.status = 'result';
             io.to(roomId).emit('room-updated', getSafeRoom(roomManager.getRoom(roomId)));
           }
         }, 3000); 
       } else {
+        // First player submitted, just update indicators
         io.to(roomId).emit('room-updated', getSafeRoom(room));
       }
     });

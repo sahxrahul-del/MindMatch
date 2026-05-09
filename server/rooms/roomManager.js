@@ -96,22 +96,31 @@ class RoomManager {
 
   submitNumber(roomId, socketId, number) {
     const room = this.rooms.get(roomId);
-    if (!room) return null;
+    if (!room) return { error: 'Room not found' };
+
+    // Strict State Machine: Only allow submissions during 'playing' phase
+    if (room.status !== 'playing') {
+      return { error: 'Game is not in selecting phase' };
+    }
+
+    // Prevent duplicate submissions from the same player in one round
+    if (room.submittedPlayers.includes(socketId)) {
+      return { error: 'You have already submitted a number' };
+    }
 
     if (typeof number !== 'number' || !Number.isInteger(number) || number < 1 || number > 20) {
-      return null;
+      return { error: 'Invalid number' };
     }
 
     room.submissions[socketId] = number;
-    if (!room.submittedPlayers.includes(socketId)) {
-      room.submittedPlayers.push(socketId);
-    }
+    room.submittedPlayers.push(socketId);
     
-    if (Object.keys(room.submissions).length === 2) {
+    // Only transition to revealing when EXACTLY 2 players have submitted
+    if (room.submittedPlayers.length === 2) {
       room.status = 'revealing';
     }
 
-    return this.getRoom(roomId);
+    return { room: this.getRoom(roomId) };
   }
 
   requestReplay(roomId, socketId) {
