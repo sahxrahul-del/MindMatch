@@ -93,6 +93,9 @@ export const GameProvider = ({ children }) => {
   }, [socket, room]);
 
   const createRoom = useCallback((username, avatar) => {
+    if (!socket || !socket.connected) {
+      return alert("Connection Error: The app is unable to reach the game server. Please ensure VITE_SERVER_URL is set correctly in Vercel and the backend is running.");
+    }
     const userData = { username, avatar };
     setUser(userData);
     localStorage.setItem('mindmatch_user', JSON.stringify(userData));
@@ -100,6 +103,9 @@ export const GameProvider = ({ children }) => {
   }, [socket]);
 
   const joinRoom = useCallback((roomId, username, avatar) => {
+    if (!socket || !socket.connected) {
+      return alert("Connection Error: The app is unable to reach the game server.");
+    }
     const userData = { username, avatar };
     setUser(userData);
     localStorage.setItem('mindmatch_user', JSON.stringify(userData));
