@@ -12,6 +12,10 @@ export const SocketProvider = ({ children }) => {
     const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
     console.log('🔌 Attempting to connect to socket server at:', serverUrl);
     
+    if (window.location.protocol === 'https:' && serverUrl.startsWith('http://') && !serverUrl.includes('localhost')) {
+      console.warn('⚠️ MIXED CONTENT WARNING: You are on an HTTPS site but trying to connect to an HTTP server. The browser may block this connection.');
+    }
+    
     const newSocket = io(serverUrl, {
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 5

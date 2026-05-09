@@ -6,13 +6,11 @@ import Button from '../components/Button';
 import AvatarPicker from '../components/AvatarPicker';
 
 const Home = () => {
-  const { createRoom, joinRoom, user, socket } = useGame(); // Added socket to check connection
+  const { createRoom, joinRoom, user, isConnected } = useGame();
   const [username, setUsername] = useState(user?.username || '');
   const [avatar, setAvatar] = useState(user?.avatar || '🦊');
   const [roomIdInput, setRoomIdInput] = useState('');
   const [mode, setMode] = useState('select'); // select, create, join
-
-  const isConnected = socket?.connected;
 
   const handleCreate = (e) => {
     e.preventDefault();

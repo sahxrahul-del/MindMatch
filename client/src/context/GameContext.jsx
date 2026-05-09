@@ -8,6 +8,7 @@ export const useGame = () => useContext(GameContext);
 export const GameProvider = ({ children }) => {
   const socket = useSocket();
   const [room, setRoom] = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('mindmatch_user');
     return saved ? JSON.parse(saved) : null;
@@ -19,6 +20,17 @@ export const GameProvider = ({ children }) => {
 
   useEffect(() => {
     if (!socket) return;
+
+    const handleConnect = () => setIsConnected(true);
+    const handleDisconnect = () => {
+      setIsConnected(false);
+      setRoom(null); // Reset room state so user drops to Home if server restarts
+      setMessages([]);
+    };
+
+    setIsConnected(socket.connected);
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
 
     socket.on('room-created', (data) => {
       setRoom(data);
@@ -76,6 +88,8 @@ export const GameProvider = ({ children }) => {
     });
 
     return () => {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
       socket.off('room-created');
       socket.off('room-updated');
       socket.off('new-message');
@@ -93,24 +107,24 @@ export const GameProvider = ({ children }) => {
   }, [socket, room]);
 
   const createRoom = useCallback((username, avatar) => {
-    if (!socket || !socket.connected) {
+    if (!socket || !isConnected) {
       return alert("Connection Error: The app is unable to reach the game server. Please ensure VITE_SERVER_URL is set correctly in Vercel and the backend is running.");
     }
     const userData = { username, avatar };
     setUser(userData);
     localStorage.setItem('mindmatch_user', JSON.stringify(userData));
     socket.emit('create-room', userData);
-  }, [socket]);
+  }, [socket, isConnected]);
 
   const joinRoom = useCallback((roomId, username, avatar) => {
-    if (!socket || !socket.connected) {
+    if (!socket || !isConnected) {
       return alert("Connection Error: The app is unable to reach the game server.");
     }
     const userData = { username, avatar };
     setUser(userData);
     localStorage.setItem('mindmatch_user', JSON.stringify(userData));
     socket.emit('join-room', { roomId, username, avatar });
-  }, [socket]);
+  }, [socket, isConnected]);
 
   const setReady = useCallback(() => {
     if (room) socket.emit('player-ready', room.id);
@@ -147,6 +161,7 @@ export const GameProvider = ({ children }) => {
   const value = {
     room,
     user,
+    isConnected,
     messages,
     isTyping,
     typingUser,
